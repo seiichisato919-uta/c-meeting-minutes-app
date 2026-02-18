@@ -6,9 +6,7 @@ Vercel Serverless Function版
 import os
 import json
 import base64
-import tempfile
 from http.server import BaseHTTPRequestHandler
-from urllib.parse import parse_qs
 
 # 議事録作成プロンプト（ルール）
 MINUTES_CREATION_PROMPT = """# 役割
@@ -329,24 +327,29 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </html>"""
 
 
-def setup_google_credentials():
-    """環境変数からGoogle認証情報をセットアップ"""
+def get_google_credentials():
+    """環境変数からGoogle認証情報を取得"""
+    from google.oauth2 import service_account
+
     creds_base64 = os.environ.get('GOOGLE_CREDENTIALS_BASE64')
     if creds_base64:
         creds_json = base64.b64decode(creds_base64).decode('utf-8')
-        # 一時ファイルに書き込み
-        fd, path = tempfile.mkstemp(suffix='.json')
-        with os.fdopen(fd, 'w') as f:
-            f.write(creds_json)
-        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = path
-        return path
+        creds_dict = json.loads(creds_json)
+        credentials = service_account.Credentials.from_service_account_info(creds_dict)
+        return credentials
     return None
 
 
 def translate_text(text: str) -> dict:
     """Google Translate APIで翻訳"""
     from google.cloud import translate_v2 as translate
-    client = translate.Client()
+
+    credentials = get_google_credentials()
+    if credentials:
+        client = translate.Client(credentials=credentials)
+    else:
+        client = translate.Client()
+
     result = client.translate(text, target_language='ja')
     return {
         "translated": result["translatedText"],
@@ -411,9 +414,6 @@ class handler(BaseHTTPRequestHandler):
                 return
 
             try:
-                # Google認証情報をセットアップ
-                setup_google_credentials()
-
                 # 翻訳
                 result = translate_text(text)
 
