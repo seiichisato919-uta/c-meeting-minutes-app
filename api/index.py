@@ -332,12 +332,13 @@ def get_google_credentials():
     from google.oauth2 import service_account
 
     creds_base64 = os.environ.get('GOOGLE_CREDENTIALS_BASE64')
-    if creds_base64:
-        creds_json = base64.b64decode(creds_base64).decode('utf-8')
-        creds_dict = json.loads(creds_json)
-        credentials = service_account.Credentials.from_service_account_info(creds_dict)
-        return credentials
-    return None
+    if not creds_base64:
+        raise ValueError("環境変数 GOOGLE_CREDENTIALS_BASE64 が設定されていません。Vercelの環境変数を確認してください。")
+
+    creds_json = base64.b64decode(creds_base64).decode('utf-8')
+    creds_dict = json.loads(creds_json)
+    credentials = service_account.Credentials.from_service_account_info(creds_dict)
+    return credentials
 
 
 def translate_text(text: str) -> dict:
@@ -345,10 +346,7 @@ def translate_text(text: str) -> dict:
     from google.cloud import translate_v2 as translate
 
     credentials = get_google_credentials()
-    if credentials:
-        client = translate.Client(credentials=credentials)
-    else:
-        client = translate.Client()
+    client = translate.Client(credentials=credentials)
 
     result = client.translate(text, target_language='ja')
     return {
