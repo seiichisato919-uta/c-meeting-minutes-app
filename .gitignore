@@ -1,0 +1,21 @@
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*.so
+
+# Environment
+.env
+*.json
+!vercel.json
+
+# Logs
+*.log
+app.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store

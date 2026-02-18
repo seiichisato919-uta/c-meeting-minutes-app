@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>英文会議 → 日本語議事録 変換システム</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .panel-header {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .panel-header h2 {
+            font-size: 1.1rem;
+            color: #495057;
+        }
+
+        .panel-body {
+            padding: 20px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 400px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            font-size: 14px;
+            line-height: 1.6;
+            resize: vertical;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 50px;
+            font-size: 1.1rem;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+            font-weight: bold;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-copy {
+            background: #28a745;
+            padding: 10px 25px;
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+
+        .btn-copy:hover {
+            box-shadow: 0 5px 20px rgba(40, 167, 69, 0.4);
+        }
+
+        .output-area {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            height: 400px;
+            overflow-y: auto;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .success-badge {
+            display: inline-block;
+            background: #d4edda;
+            color: #155724;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            margin-bottom: 10px;
+        }
+
+        .info-box {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 0.9rem;
+            color: #856404;
+        }
+
+        .info-box h3 {
+            margin-bottom: 10px;
+        }
+
+        .info-box ul {
+            margin-left: 20px;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e9ecef;
+            margin-bottom: 15px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.3s;
+        }
+
+        .tab:hover {
+            background: #f8f9fa;
+        }
+
+        .tab.active {
+            border-bottom-color: #667eea;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>英文会議 → 日本語議事録 変換システム</h1>
+            <p>英語の会議文字起こしを入力すると、日本語の議事録形式に変換します</p>
+        </header>
+
+        <div class="main-content">
+            <!-- 入力パネル -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>入力：英文会議の文字起こし</h2>
+                </div>
+                <div class="panel-body">
+                    <textarea id="inputText" placeholder="ここに英語の会議文字起こしを貼り付けてください...
+
+例:
+John: Good morning everyone. Let's start the meeting about the new mold design project.
+Mary: Thank you, John. First, I'd like to discuss the timeline for the prototype delivery.
+..."></textarea>
+
+                    <div class="btn-container">
+                        <button class="btn" id="translateBtn" onclick="translateText()">
+                            翻訳して議事録を作成
+                        </button>
+                    </div>
+
+                    <div class="loading" id="loading">
+                        <div class="spinner"></div>
+                        <p>翻訳中です。しばらくお待ちください...</p>
+                    </div>
+
+                    <div id="errorContainer"></div>
+                </div>
+            </div>
+
+            <!-- 出力パネル -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>出力：日本語議事録</h2>
+                </div>
+                <div class="panel-body">
+                    <div class="tabs">
+                        <div class="tab active" onclick="switchTab('minutes')">議事録</div>
+                        <div class="tab" onclick="switchTab('translation')">翻訳のみ</div>
+                    </div>
+
+                    <div id="minutesTab" class="tab-content active">
+                        <div id="minutesOutput" class="output-area">
+                            ここに議事録が表示されます...
+                        </div>
+                        <button class="btn btn-copy" onclick="copyToClipboard('minutesOutput')">
+                            議事録をコピー
+                        </button>
+                    </div>
+
+                    <div id="translationTab" class="tab-content">
+                        <div id="translationOutput" class="output-area">
+                            ここに翻訳結果が表示されます...
+                        </div>
+                        <button class="btn btn-copy" onclick="copyToClipboard('translationOutput')">
+                            翻訳をコピー
+                        </button>
+                    </div>
+
+                    <div id="detectedLang" style="display: none; margin-top: 10px;">
+                        <span class="success-badge">検出言語: <span id="langCode"></span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 注意事項 -->
+        <div class="info-box">
+            <h3>議事録作成時の注意事項</h3>
+            <ul>
+                <li><strong>数字・日付</strong>: 必ず単位付きで確認。日付は「3月4日（原文: 3/4）」のように補足</li>
+                <li><strong>否定表現</strong>: not/no/unlessによる意味反転に注意</li>
+                <li><strong>主語の明確化</strong>: we/they/youは会社名・担当者名に置換</li>
+                <li><strong>不明箇所</strong>: 「（聞き取り不明瞭）」「（固有名詞不明）」「（詳細要確認）」で明示</li>
+                <li><strong>推測厳禁</strong>: 聞き取れない箇所を勝手に補完しない</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        async function translateText() {
+            const inputText = document.getElementById('inputText').value;
+            const translateBtn = document.getElementById('translateBtn');
+            const loading = document.getElementById('loading');
+            const errorContainer = document.getElementById('errorContainer');
+
+            // 入力チェック
+            if (!inputText.trim()) {
+                showError('テキストを入力してください');
+                return;
+            }
+
+            // UI更新
+            translateBtn.disabled = true;
+            loading.classList.add('active');
+            errorContainer.innerHTML = '';
+
+            try {
+                const response = await fetch('/translate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text: inputText })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    showError(data.error);
+                    return;
+                }
+
+                // 結果を表示
+                document.getElementById('minutesOutput').textContent = data.minutes;
+                document.getElementById('translationOutput').textContent = data.translated;
+                document.getElementById('langCode').textContent = data.detected_language.toUpperCase();
+                document.getElementById('detectedLang').style.display = 'block';
+
+            } catch (error) {
+                showError('通信エラーが発生しました: ' + error.message);
+            } finally {
+                translateBtn.disabled = false;
+                loading.classList.remove('active');
+            }
+        }
+
+        function showError(message) {
+            const errorContainer = document.getElementById('errorContainer');
+            errorContainer.innerHTML = `<div class="error">${message}</div>`;
+        }
+
+        function switchTab(tabName) {
+            // タブの切り替え
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            if (tabName === 'minutes') {
+                document.querySelector('.tab:first-child').classList.add('active');
+                document.getElementById('minutesTab').classList.add('active');
+            } else {
+                document.querySelector('.tab:last-child').classList.add('active');
+                document.getElementById('translationTab').classList.add('active');
+            }
+        }
+
+        function copyToClipboard(elementId) {
+            const text = document.getElementById(elementId).textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('クリップボードにコピーしました');
+            }).catch(err => {
+                alert('コピーに失敗しました: ' + err);
+            });
+        }
+
+        // Enterキーで翻訳実行（Ctrl+Enter）
+        document.getElementById('inputText').addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+                translateText();
+            }
+        });
+    </script>
+</body>
+</html>
